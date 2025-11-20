@@ -1,200 +1,67 @@
-# Makefile for Recipe Manager Application
-# This file contains common tasks for development, testing, and deployment
-#
-# Usage: make <target>
-# Example: make dev
+COMPOSE = docker compose
+BACKEND_DIR = ./backend
+FRONTEND_DIR = ./frontend
 
-.PHONY: help setup check-versions install dev stop clean migrate test-backend test-frontend test lint logs shell-backend shell-db
+.PHONY: setup install dev stop clean reset migrate test-backend test-frontend lint logs shell-backend shell-db ensure-env
 
-# Default target - show help
-help:
-	@echo "Recipe Manager - Available Make Targets"
-	@echo "========================================"
-	@echo ""
-	@echo "Prerequisites:"
-	@echo "  Requires Python 3.13+ and Node 24+"
-	@echo "  Recommended: Install mise (https://mise.jdx.dev/) and run 'mise install'"
-	@echo ""
-	@echo "Setup & Installation:"
-	@echo "  make check-versions  - Check if Python 3.13+ and Node 24+ are installed"
-	@echo "  make setup           - Initial project setup (create .env, prepare directories)"
-	@echo "  make install         - Install all dependencies (frontend & backend)"
-	@echo ""
-	@echo "Development:"
-	@echo "  make dev             - Start all services with Docker Compose"
-	@echo "  make stop            - Stop all running services"
-	@echo "  make restart         - Restart all services"
-	@echo "  make logs            - View logs from all services"
-	@echo ""
-	@echo "Database:"
-	@echo "  make migrate         - Run database migrations"
-	@echo "  make migrate-create  - Create a new migration"
-	@echo "  make shell-db        - Open PostgreSQL shell"
-	@echo ""
-	@echo "Testing:"
-	@echo "  make test            - Run all tests (backend & frontend)"
-	@echo "  make test-backend    - Run backend tests only"
-	@echo "  make test-frontend   - Run frontend tests only"
-	@echo ""
-	@echo "Code Quality:"
-	@echo "  make lint            - Run linters for both frontend and backend"
-	@echo "  make format          - Format code (black for Python, prettier for JS/TS)"
-	@echo ""
-	@echo "Utilities:"
-	@echo "  make shell-backend   - Open a shell in the backend container"
-	@echo "  make clean           - Clean up containers, volumes, and cache files"
-	@echo "  make reset           - Complete reset (clean + setup)"
-	@echo ""
+# Create .env from the example file if missing, then install dependencies
+setup: ensure-env install
 
-# Initial setup - create necessary files and directories
-setup:
-	@echo "Setting up Recipe Manager project..."
-	@if [ ! -f .env ]; then \
-		if [ -f .env.example ]; then \
-			cp .env.example .env; \
-			echo "Created .env from .env.example"; \
-		else \
-			echo "DB_HOST=localhost" > .env; \
-			echo "DB_PORT=5432" >> .env; \
-			echo "DB_NAME=recipe_db" >> .env; \
-			echo "DB_USER=recipe_user" >> .env; \
-			echo "DB_PASSWORD=recipe_password" >> .env; \
-			echo "ENVIRONMENT=development" >> .env; \
-			echo "Created default .env file"; \
-		fi \
-	else \
-		echo ".env file already exists"; \
-	fi
-	@echo "Setup complete!"
+# Install backend and frontend dependencies locally
+install:
+	@echo "Installing backend dependencies..."
+	@cd $(BACKEND_DIR) && python3 -m pip install -r requirements.txt
+	@echo "Installing frontend dependencies..."
+	@cd $(FRONTEND_DIR) && npm install
 
-# Check prerequisites
-check-versions:
-	@echo "Checking runtime versions..."
-	@command -v python3 >/dev/null 2>&1 || { echo "Error: python3 not found. Please install Python 3.13+"; echo "Recommended: Install mise (https://mise.jdx.dev/) and run 'mise install'"; exit 1; }
-	@command -v node >/dev/null 2>&1 || { echo "Error: node not found. Please install Node 24+"; echo "Recommended: Install mise (https://mise.jdx.dev/) and run 'mise install'"; exit 1; }
-	@echo "✓ Python: $$(python3 --version)"
-	@echo "✓ Node: $$(node --version)"
-	@echo ""
-
-# Install all dependencies
-install: check-versions
-	@echo "Installing dependencies..."
-	@if [ -d "backend" ]; then \
-		echo "Installing backend dependencies..."; \
-		cd backend && python3 -m venv venv && . venv/bin/activate && pip install -r requirements.txt; \
-	else \
-		echo "Backend directory not found. Skipping backend installation."; \
-	fi
-	@if [ -d "frontend" ]; then \
-		echo "Installing frontend dependencies..."; \
-		cd frontend && npm install; \
-	else \
-		echo "Frontend directory not found. Skipping frontend installation."; \
-	fi
-	@echo "Dependencies installed!"
-
-# Start all services
+# Start all services in the background
 dev:
-	@echo "Starting all services with Docker Compose..."
-	docker compose up -d
-	@echo ""
-	@echo "Services are starting up!"
-	@echo "Frontend:  http://localhost:3000"
-	@echo "Backend:   http://localhost:8000"
-	@echo "API Docs:  http://localhost:8000/docs"
-	@echo ""
-	@echo "Run 'make logs' to view logs"
+	$(COMPOSE) up -d
 
-# Stop all services
+# Stop all running services without removing volumes
 stop:
-	@echo "Stopping all services..."
-	docker compose down
+	$(COMPOSE) stop
 
-# Restart all services
-restart: stop dev
-
-# View logs from all services
-logs:
-	docker compose logs -f
-
-# Run database migrations
-migrate:
-	@echo "Running database migrations..."
-	@if [ -d "backend" ]; then \
-		docker compose exec backend alembic upgrade head; \
-	else \
-		echo "Backend directory not found. Cannot run migrations."; \
-	fi
-
-# Create a new database migration
-migrate-create:
-	@echo "Creating new migration..."
-	@read -p "Enter migration message: " message; \
-	docker compose exec backend alembic revision --autogenerate -m "$$message"
-
-# Run all tests
-test: test-backend test-frontend
-
-# Run backend tests
-test-backend:
-	@echo "Running backend tests..."
-	@if [ -d "backend" ]; then \
-		docker compose exec backend pytest -v; \
-	else \
-		echo "Backend directory not found. Cannot run tests."; \
-	fi
-
-# Run frontend tests
-test-frontend:
-	@echo "Running frontend tests..."
-	@if [ -d "frontend" ]; then \
-		docker compose exec frontend npm test; \
-	else \
-		echo "Frontend directory not found. Cannot run tests."; \
-	fi
-
-# Run linters
-lint:
-	@echo "Running linters..."
-	@if [ -d "backend" ]; then \
-		echo "Linting backend..."; \
-		docker compose exec backend flake8 .; \
-	fi
-	@if [ -d "frontend" ]; then \
-		echo "Linting frontend..."; \
-		docker compose exec frontend npm run lint; \
-	fi
-
-# Format code
-format:
-	@echo "Formatting code..."
-	@if [ -d "backend" ]; then \
-		echo "Formatting backend with black..."; \
-		docker compose exec backend black .; \
-	fi
-	@if [ -d "frontend" ]; then \
-		echo "Formatting frontend with prettier..."; \
-		docker compose exec frontend npm run format; \
-	fi
-
-# Open a shell in the backend container
-shell-backend:
-	docker compose exec backend /bin/bash
-
-# Open a PostgreSQL shell
-shell-db:
-	docker compose exec db psql -U recipe_user -d recipe_db
-
-# Clean up everything
+# Remove containers and volumes
 clean:
-	@echo "Cleaning up..."
-	docker compose down -v
-	@if [ -d "backend/__pycache__" ]; then rm -rf backend/__pycache__; fi
-	@if [ -d "backend/.pytest_cache" ]; then rm -rf backend/.pytest_cache; fi
-	@if [ -d "frontend/.next" ]; then rm -rf frontend/.next; fi
-	@if [ -d "frontend/node_modules" ]; then rm -rf frontend/node_modules; fi
-	@echo "Cleanup complete!"
+	$(COMPOSE) down -v
 
-# Complete reset
+# Reset the project by cleaning and running setup again
 reset: clean setup
-	@echo "Project reset complete!"
+
+# Apply database migrations with Alembic inside the backend container
+migrate:
+	$(COMPOSE) exec backend alembic upgrade head
+
+# Run backend tests with pytest
+test-backend:
+	$(COMPOSE) exec backend pytest -v
+
+# Run frontend tests with npm test (Jest)
+test-frontend:
+	$(COMPOSE) exec frontend npm test
+
+# Run linting for backend and frontend
+lint:
+	$(COMPOSE) exec backend flake8 app
+	$(COMPOSE) exec frontend npm run lint
+
+# Stream logs from all services
+logs:
+	$(COMPOSE) logs -f
+
+# Open an interactive shell inside the backend container
+shell-backend:
+	$(COMPOSE) exec backend /bin/bash
+
+# Open a psql shell connected to the project database
+shell-db:
+	$(COMPOSE) exec db bash -c 'export PGPASSWORD="$${POSTGRES_PASSWORD}"; psql -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"'
+
+# Helper target to create .env if it does not already existmake shell-db
+ensure-env:
+	@if [ ! -f .env ]; then \
+		cp .env.example .env && echo "Created .env from .env.example"; \
+	else \
+		echo ".env already exists; skipping copy."; \
+	fi
