@@ -10,3 +10,4 @@ class Settings:
 
 
 settings = Settings()
+DATABASE_URL = settings.DATABASE_URL
