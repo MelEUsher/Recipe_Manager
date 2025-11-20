@@ -28,9 +28,9 @@ def get_database_url() -> str:
     if url:
         return url
 
-    from app.config.settings import DATABASE_URL
+    from app.config.settings import settings
 
-    return DATABASE_URL
+    return settings.DATABASE_URL
 
 
 def run_migrations_offline() -> None:
