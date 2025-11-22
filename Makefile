@@ -39,7 +39,10 @@ test-backend:
 
 # Run frontend tests with npm test (Jest)
 test-frontend:
-	$(COMPOSE) exec frontend npm test
+	$(COMPOSE) exec frontend npm run test
+
+# Run all tests
+test: test-backend test-frontend
 
 # Run linting for backend and frontend
 lint:
