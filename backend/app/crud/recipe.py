@@ -46,6 +46,7 @@ def update_recipe(db: Session, db_recipe: models.Recipe, recipe_in: schemas.Reci
         setattr(db_recipe, field, value)
 
     if ingredients_data is not None:
+        # Replace the entire ingredient collection to keep DB state aligned with the submitted payload.
         db_recipe.ingredients.clear()
         for ingredient in ingredients_data:
             db_recipe.ingredients.append(
