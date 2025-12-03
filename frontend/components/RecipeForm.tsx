@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { IngredientInput, RecipePayload } from "../lib/api";
+import { createCategory, getCategories, type Category, type CategoryInput, type IngredientInput, type RecipePayload } from "../lib/api";
 
 interface RecipeFormProps {
   initialValues?: RecipePayload;
@@ -50,12 +50,35 @@ export default function RecipeForm({
   submitLabel = "Save Recipe",
 }: RecipeFormProps) {
   const [formValues, setFormValues] = useState<RecipePayload>(buildInitialValues(initialValues));
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(false);
+  const [creatingCategory, setCreatingCategory] = useState(false);
+  const [showCategoryForm, setShowCategoryForm] = useState(false);
+  const [newCategory, setNewCategory] = useState<CategoryInput>({ name: "", description: "" });
+  const [categoryError, setCategoryError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setFormValues(buildInitialValues(initialValues));
   }, [initialValues]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      setLoadingCategories(true);
+      try {
+        const data = await getCategories();
+        setCategories([...data].sort((a, b) => a.name.localeCompare(b.name)));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Failed to load categories.";
+        setCategoryError(message);
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    loadCategories();
+  }, []);
 
   const handleInputChange = (field: keyof RecipePayload, value: string) => {
     setFormValues((prev) => ({
@@ -69,6 +92,51 @@ export default function RecipeForm({
       ...prev,
       [field]: value === "" ? undefined : Number(value),
     }));
+  };
+
+  const handleCategorySelect = (value: string) => {
+    setFormValues((prev) => ({
+      ...prev,
+      category_id: value === "" ? undefined : Number(value),
+    }));
+  };
+
+  const handleNewCategoryChange = (field: keyof CategoryInput, value: string) => {
+    setNewCategory((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategory.name.trim()) {
+      setCategoryError("Category name is required.");
+      return;
+    }
+
+    setCreatingCategory(true);
+    setCategoryError(null);
+
+    try {
+      const payload: CategoryInput = {
+        name: newCategory.name.trim(),
+        description: newCategory.description?.trim() || undefined,
+      };
+
+      const created = await createCategory(payload);
+      setCategories((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setFormValues((prev) => ({
+        ...prev,
+        category_id: created.id,
+      }));
+      setShowCategoryForm(false);
+      setNewCategory({ name: "", description: "" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to create category.";
+      setCategoryError(message);
+    } finally {
+      setCreatingCategory(false);
+    }
   };
 
   const handleIngredientChange = (index: number, field: keyof IngredientInput, value: string) => {
@@ -146,17 +214,109 @@ export default function RecipeForm({
 
         <div className="space-y-2">
           <label className="text-sm font-medium text-slate-800" htmlFor="category">
-            Category ID
+            Category
           </label>
-          <input
-            id="category"
-            type="number"
-            min={0}
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-            value={formValues.category_id ?? ""}
-            onChange={(event) => handleNumberChange("category_id", event.target.value)}
-            placeholder="Optional numeric category ID"
-          />
+          <div className="space-y-3">
+            <select
+              id="category"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+              value={formValues.category_id ?? ""}
+              onChange={(event) => handleCategorySelect(event.target.value)}
+            >
+              <option value="">No category</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                className="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50"
+                onClick={() => {
+                  setShowCategoryForm((prev) => !prev);
+                  setCategoryError(null);
+                }}
+              >
+                {showCategoryForm ? "Close new category" : "Add category"}
+              </button>
+              <button
+                type="button"
+                className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                onClick={async () => {
+                  setLoadingCategories(true);
+                  setCategoryError(null);
+                  try {
+                    const data = await getCategories();
+                    setCategories([...data].sort((a, b) => a.name.localeCompare(b.name)));
+                  } catch (err) {
+                    const message = err instanceof Error ? err.message : "Failed to refresh categories.";
+                    setCategoryError(message);
+                  } finally {
+                    setLoadingCategories(false);
+                  }
+                }}
+              >
+                Refresh
+              </button>
+              {loadingCategories ? <span className="text-xs text-slate-500">Loading categories…</span> : null}
+            </div>
+            {categoryError ? <p className="text-sm text-red-600">{categoryError}</p> : null}
+            {showCategoryForm ? (
+              <div className="space-y-3 rounded-xl border border-slate-200 p-4">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-slate-600" htmlFor="new-category-name">
+                      Category Name
+                    </label>
+                    <input
+                      id="new-category-name"
+                      type="text"
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                      value={newCategory.name}
+                      onChange={(event) => handleNewCategoryChange("name", event.target.value)}
+                      placeholder="e.g., Vegetarian"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-medium text-slate-600" htmlFor="new-category-description">
+                      Description (optional)
+                    </label>
+                    <input
+                      id="new-category-description"
+                      type="text"
+                      className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-slate-900 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                      value={newCategory.description ?? ""}
+                      onChange={(event) => handleNewCategoryChange("description", event.target.value)}
+                      placeholder="Short summary"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    onClick={handleCreateCategory}
+                    disabled={creatingCategory}
+                  >
+                    {creatingCategory ? "Saving..." : "Save category"}
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    onClick={() => {
+                      setShowCategoryForm(false);
+                      setNewCategory({ name: "", description: "" });
+                      setCategoryError(null);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -248,7 +408,7 @@ export default function RecipeForm({
             >
               <div className="md:col-span-5">
                 <label className="text-xs font-medium text-slate-600" htmlFor={`ingredient-name-${index}`}>
-                  Name
+                  Ingredient name
                 </label>
                 <input
                   id={`ingredient-name-${index}`}

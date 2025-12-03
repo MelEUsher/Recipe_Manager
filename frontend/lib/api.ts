@@ -17,6 +17,11 @@ export interface Category {
   description?: string | null;
 }
 
+export interface CategoryInput {
+  name: string;
+  description?: string;
+}
+
 export interface RecipePayload {
   title: string;
   description?: string;
@@ -73,6 +78,24 @@ export async function getRecipe(id: number | string): Promise<Recipe> {
     cache: "no-store",
   });
   return handleResponse<Recipe>(response);
+}
+
+export async function getCategories(): Promise<Category[]> {
+  const response = await fetch(`${API_BASE_URL}/api/categories`, {
+    cache: "no-store",
+  });
+  return handleResponse<Category[]>(response);
+}
+
+export async function createCategory(payload: CategoryInput): Promise<Category> {
+  const response = await fetch(`${API_BASE_URL}/api/categories`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<Category>(response);
 }
 
 export async function createRecipe(payload: RecipePayload): Promise<Recipe> {
