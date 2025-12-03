@@ -34,6 +34,7 @@ function buildInitialValues(initialValues?: RecipePayload): RecipePayload {
     servings: initialValues.servings,
     category_id: initialValues.category_id,
     ingredients:
+      // Always keep at least one ingredient row so the form stays controlled.
       initialValues.ingredients?.length && initialValues.ingredients.length > 0
         ? initialValues.ingredients.map((ingredient) => ({
             name: ingredient.name ?? "",

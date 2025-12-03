@@ -66,5 +66,17 @@ To stop or clean up: `make stop` (keeps volumes) or `make clean` (removes contai
 - `.env.example` – Environment variable template
 - `SETUP.md`, `README-MISE.md` – Additional setup notes
 
+## API Overview
+- `GET /health` – Simple service check; returns `{"status": "ok"}`.
+- `GET /api/categories` – List categories.
+- `POST /api/categories` – Create a category (`name` required, optional `description`); errors if the name already exists.
+- `GET /api/recipes` – List recipes (optional `category_id` query filters by category).
+- `POST /api/recipes` – Create a recipe with `title` plus optional fields (`description`, `instructions`, `prep_time`, `cook_time`, `servings`, `category_id`) and an `ingredients` array (`name`, optional `amount`, `unit`).
+- `GET /api/recipes/{recipe_id}` – Fetch a recipe with its category and ingredients.
+- `PUT /api/recipes/{recipe_id}` – Update a recipe; any provided field replaces the existing value. Supplying `ingredients` replaces the full ingredient list.
+- `DELETE /api/recipes/{recipe_id}` – Delete a recipe (its ingredients are cascade-deleted).
+
+Interactive docs are available at `http://localhost:8000/docs` (Swagger UI) and `http://localhost:8000/redoc` when the backend is running.
+
 ## Tutorial Context
 This repository reflects the completed outputs of tutorial prompts 1–9 for the Recipe Manager project: initializing the stack, wiring Docker Compose, adding tests, and finalizing documentation.
